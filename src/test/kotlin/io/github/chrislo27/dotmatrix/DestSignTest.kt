@@ -77,6 +77,7 @@ object DestSignTest {
             "7d" to DotMtxFont(readClasspathResourceAsString("dotmatrix/variable/7DVW.json"), readClasspathResAsImage("dotmatrix/variable/7DVW.png")),
             "8" to DotMtxFont(readClasspathResourceAsString("dotmatrix/variable/8VW.json"), readClasspathResAsImage("dotmatrix/variable/8VW.png")),
             "8d" to DotMtxFont(readClasspathResourceAsString("dotmatrix/variable/8DVW.json"), readClasspathResAsImage("dotmatrix/variable/8DVW.png")),
+            "9" to DotMtxFont(readClasspathResourceAsString("dotmatrix/variable/9VW.json"), readClasspathResAsImage("dotmatrix/variable/9VW.png")),
             "9d" to DotMtxFont(readClasspathResourceAsString("dotmatrix/variable/9DVW.json"), readClasspathResAsImage("dotmatrix/variable/9DVW.png")),
             "10d" to DotMtxFont(readClasspathResourceAsString("dotmatrix/variable/10DVW.json"), readClasspathResAsImage("dotmatrix/variable/10DVW.png")),
             "11d" to DotMtxFont(readClasspathResourceAsString("dotmatrix/variable/11DVW.json"), readClasspathResAsImage("dotmatrix/variable/11DVW.png")),
@@ -88,6 +89,7 @@ object DestSignTest {
             "16t" to DotMtxFont(readClasspathResourceAsString("dotmatrix/variable/16TVW.json"), readClasspathResAsImage("dotmatrix/variable/16TVW.png")),
             "22t" to DotMtxFont(readClasspathResourceAsString("dotmatrix/variable/22TVW.json"), readClasspathResAsImage("dotmatrix/variable/22TVW.png")),
             "24q" to DotMtxFont(readClasspathResourceAsString("dotmatrix/variable/24QVW.json"), readClasspathResAsImage("dotmatrix/variable/24QVW.png")),
+            "f16" to DotMtxFont(readClasspathResourceAsString("dotmatrix/variable/F16VW.json"), readClasspathResAsImage("dotmatrix/variable/F16VW.png")),
             "5x7" to DotMtxFont(readClasspathResourceAsString("dotmatrix/fixed/5X7.json"), readClasspathResAsImage("dotmatrix/fixed/5X7.png")),
             "8x14" to DotMtxFont(readClasspathResourceAsString("dotmatrix/fixed/8X14.json"), readClasspathResAsImage("dotmatrix/fixed/8X14.png"))
         )
@@ -160,21 +162,31 @@ object DestSignTest {
 //            )
 //        )
         sign.destination = Destination(
+            // 1. The Route Number (Left Side)
             LayoutLines(listOf(
-                GlyphLayout(listOf(
-                    GlyphRun(fonts.getValue("16d"), parseDestSignEscapes("""\g0\gE\g7\g0\1
-\g8\gF\gF\g1\1\~""".replace("\n", "")), Color(255, 0, 0)).apply { 
-                                                              println("width: ${this.width}    ${this.lastAdvance}")
-                    },
-                    GlyphRun(fonts.getValue("16d"), "L", Color(0, 0, 0))
-                ), VerticalAlignment.CENTRE, TextAlignment.LEFT)
+                GlyphLayout(
+                    listOf(GlyphRun(fonts.getValue("16d"), "130", DestSign.ORANGE)),
+                    VerticalAlignment.CENTRE,
+                    TextAlignment.CENTRE
+                )
             ), LineSpacing.FLUSH_TO_EDGES),
+
+            // 2. The Destination Text (Right Side - Stacked)
             listOf(
                 DestinationFrame(listOf(
                     LayoutLines(listOf(
-                        GlyphLayout(listOf(
-                            GlyphRun(fonts.getValue("12d"), "SUNNYDALE", DestSign.ORANGE)
-                        )),
+                        // Top Line
+                        GlyphLayout(
+                            listOf(GlyphRun(fonts.getValue("8d"), "W I L L I N G D O N", DestSign.ORANGE)),
+                            VerticalAlignment.TOP,
+                            TextAlignment.CENTRE
+                        ),
+                        // Bottom Line
+                        GlyphLayout(
+                            listOf(GlyphRun(fonts.getValue("7"), "TO METROTOWN STN", DestSign.ORANGE)),
+                            VerticalAlignment.BOTTOM,
+                            TextAlignment.CENTRE
+                        )
                     ), LineSpacing.FLUSH_TO_EDGES)
                 ))
             )
