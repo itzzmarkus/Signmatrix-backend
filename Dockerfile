@@ -6,6 +6,6 @@ COPY . .
 
 RUN chmod +x ./gradlew
 
-RUN ./gradlew build --no-daemon -Dorg.gradle.jvmargs="-Xmx256m -XX:MaxMetaspaceSize=128m"
+RUN ./gradlew build --no-daemon -Dorg.gradle.jvmargs="-Xmx192m -XX:MaxMetaspaceSize=256m"
 
 CMD ["./gradlew", "run", "--no-daemon"]
