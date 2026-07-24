@@ -6,7 +6,8 @@ import java.net.InetSocketAddress
 import javax.imageio.ImageIO
 
 fun main() {
-    val server = HttpServer.create(InetSocketAddress(8080), 0)
+    val port = System.getenv("PORT")?.toIntOrNull() ?: 8080
+    val server = HttpServer.create(InetSocketAddress("0.0.0.0", port), 0)
 
     server.createContext("/api/sign") { exchange ->
         exchange.responseHeaders.add("Access-Control-Allow-Origin", "*")
