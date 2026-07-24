@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm") version "1.9.10"
     `maven-publish`
+    application
 }
 group = "io.github.chrislo27"
 version = "3.4.0"
@@ -27,4 +28,8 @@ publishing {
             from(components["kotlin"])
         }
     }
+}
+
+application {
+    mainClass.set("io.github.chrislo27.dotmatrix.SignApiServerKt")
 }
