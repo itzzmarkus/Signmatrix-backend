@@ -174,6 +174,7 @@ fun main() {
                 ImageIO.write(sign.generateImageForState(0).backing, "png", exchange.responseBody)
             }
             exchange.responseBody.close()
+            println("SIGN_GENERATED: $query")
 
         } catch (e: Exception) {
             e.printStackTrace()
