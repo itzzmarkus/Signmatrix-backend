@@ -4,11 +4,6 @@ import com.sun.net.httpserver.HttpServer
 import io.github.chrislo27.dotmatrix.img.Color
 import java.net.InetSocketAddress
 import javax.imageio.ImageIO
-import javax.imageio.ImageTypeSpecifier
-import javax.imageio.metadata.IIOMetadataNode
-import javax.imageio.IIOImage
-import java.awt.image.BufferedImage
-import java.io.OutputStream
 
 fun main() {
     val port = System.getenv("PORT")?.toIntOrNull() ?: 8080
@@ -36,7 +31,7 @@ fun main() {
             val g = hexColor.substring(2, 4).toInt(16)
             val b = hexColor.substring(4, 6).toInt(16)
             Color(r, g, b, 255)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             DestSign.ORANGE
         }
 
@@ -54,14 +49,44 @@ fun main() {
             val line2FontFrames = (params["line2Font"] ?: "").split("|")
             val line2SpacingFrames = (params["line2Spacing"] ?: "0").split("|")
 
-            val frameCount = maxOf(line1Frames.size, line2Frames.size, routeFrames.size)
+            val animFrames = (params["animation"] ?: "").split("|")
+            val animSpeedFrames = (params["animSpeed"] ?: "").split("|")
 
-            val bufferedImages = mutableListOf<BufferedImage>()
+            val globalRouteStr = routeFrames.firstOrNull() ?: ""
+            val globalRouteFont = routeFontFrames.firstOrNull() ?: "16d"
+
+            val routeSuffix = params["routeSuffix"] ?: ""
+            val routeSuffixFont = params["routeSuffixFont"] ?: "8d"
+
+            val routeText = parseDestSignEscapes(globalRouteStr)
+            val routeSuffixText = parseDestSignEscapes(routeSuffix)
+
+            val routeLines = if (routeText.isNotEmpty() || routeSuffixText.isNotEmpty()) {
+                val runs = mutableListOf<GlyphRun>()
+                if (routeText.isNotEmpty()) {
+                    runs.add(GlyphRun(fonts.getValue(globalRouteFont), routeText, signColor))
+                }
+                if (routeSuffixText.isNotEmpty()) {
+                    runs.add(GlyphRun(fonts.getValue(routeSuffixFont), routeSuffixText, signColor))
+                }
+                val layout = GlyphLayout(runs, VerticalAlignment.BOTTOM, TextAlignment.CENTRE)
+                LayoutLines(listOf(layout), LineSpacing.FLUSH_TO_EDGES)
+            } else {
+                LayoutLines(emptyList())
+            }
+            val routeAlignStr = params["routeAlign"]?.uppercase() ?: "LEFT"
+            val routeAlign = if (routeAlignStr == "RIGHT") TextAlignment.RIGHT else TextAlignment.LEFT
+
+            val l1AlignFrames = (params["line1Align"] ?: "").split("|")
+            val l2AlignFrames = (params["line2Align"] ?: "").split("|")
+            val verticalSpacingFrames = (params["verticalSpacing"] ?: "").split("|")
+
+            val frameCount = maxOf(line1Frames.size, line2Frames.size)
+
+            val destFrames = mutableListOf<DestinationFrame>()
+            val screenTimes = mutableListOf<Float>()
 
             for (i in 0 until frameCount) {
-                val rStr = routeFrames.getOrElse(i) { routeFrames.lastOrNull() ?: "" }
-                val rFont = routeFontFrames.getOrElse(i) { routeFontFrames.lastOrNull() ?: "16d" }
-
                 val l1Str = line1Frames.getOrElse(i) { line1Frames.lastOrNull() ?: "" }
                 val l1FontStr = line1FontFrames.getOrElse(i) { line1FontFrames.lastOrNull() ?: "" }
                 val l1Space = line1SpacingFrames.getOrElse(i) { line1SpacingFrames.lastOrNull() ?: "0" }
@@ -69,7 +94,6 @@ fun main() {
                 val l2Str = line2Frames.getOrElse(i) { line2Frames.lastOrNull() ?: "" }
                 val l2FontStr = line2FontFrames.getOrElse(i) { line2FontFrames.lastOrNull() ?: "" }
                 val l2Space = line2SpacingFrames.getOrElse(i) { line2SpacingFrames.lastOrNull() ?: "0" }
-                val routeText = parseDestSignEscapes(rStr)
 
                 val line1Raw = parseDestSignEscapes(l1Str)
                 val line1Text = applyLetterSpacing(line1Raw, l1Space)
@@ -81,43 +105,73 @@ fun main() {
                 val line1Font = if (l1FontStr.isNotBlank()) l1FontStr else (if (isStacked) "8d" else "15d")
                 val line2Font = if (l2FontStr.isNotBlank()) l2FontStr else "16d"
 
-                val routeLines = if (routeText.isNotEmpty()) {
-                    val run = GlyphRun(fonts.getValue(rFont), routeText, signColor)
-                    val layout = GlyphLayout(listOf(run), VerticalAlignment.CENTRE, TextAlignment.CENTRE)
-                    LayoutLines(listOf(layout), LineSpacing.FLUSH_TO_EDGES)
-                } else {
-                    LayoutLines(emptyList())
+                val destLayouts = mutableListOf<GlyphLayout>()
+
+                val animStr = animFrames.getOrElse(i) { animFrames.lastOrNull() ?: "NONE" }
+                val animSpeedStr = animSpeedFrames.getOrElse(i) { animSpeedFrames.lastOrNull() ?: "0.25" }
+                val animSpeed = animSpeedStr.toFloatOrNull() ?: 0.25f
+
+                val animationType = when (animStr.uppercase()) {
+                    "FALLDOWN" -> AnimationType.Falldown(animSpeed)
+                    "FALLUP" -> AnimationType.Fallup(animSpeed)
+                    "SIDEWIPE" -> AnimationType.Sidewipe(animSpeed)
+                    "SCROLL" -> AnimationType.HorizontalScroll(animSpeed)
+                    else -> AnimationType.NoAnimation
                 }
 
-                val destLayouts = mutableListOf<GlyphLayout>()
+                val l1AlignStr = l1AlignFrames.getOrElse(i) { l1AlignFrames.lastOrNull() ?: "CENTRE" }
+                val l2AlignStr = l2AlignFrames.getOrElse(i) { l2AlignFrames.lastOrNull() ?: "CENTRE" }
+                val vSpacingStr = verticalSpacingFrames.getOrElse(i) { verticalSpacingFrames.lastOrNull() ?: "FLUSH" }
+
+                val l1Align = when(l1AlignStr.uppercase()) {
+                    "LEFT" -> TextAlignment.LEFT
+                    "RIGHT" -> TextAlignment.RIGHT
+                    else -> TextAlignment.CENTRE
+                }
+                val l2Align = when(l2AlignStr.uppercase()) {
+                    "LEFT" -> TextAlignment.LEFT
+                    "RIGHT" -> TextAlignment.RIGHT
+                    else -> TextAlignment.CENTRE
+                }
+                val vSpacing = if (vSpacingStr.uppercase() == "EQUISPACED") LineSpacing.EQUISPACED else LineSpacing.FLUSH_TO_EDGES
 
                 if (!isStacked) {
                     val run1 = GlyphRun(fonts.getValue(line1Font), line1Text, signColor)
-                    destLayouts.add(GlyphLayout(listOf(run1), VerticalAlignment.CENTRE, TextAlignment.CENTRE))
+                    destLayouts.add(GlyphLayout(listOf(run1), VerticalAlignment.CENTRE, l1Align))
                 } else {
                     val run1 = GlyphRun(fonts.getValue(line1Font), line1Text, signColor)
                     val run2 = GlyphRun(fonts.getValue(line2Font), line2Text, signColor)
-                    destLayouts.add(GlyphLayout(listOf(run1), VerticalAlignment.TOP, TextAlignment.CENTRE))
-                    destLayouts.add(GlyphLayout(listOf(run2), VerticalAlignment.BOTTOM, TextAlignment.CENTRE))
+                    destLayouts.add(GlyphLayout(listOf(run1), VerticalAlignment.TOP, l1Align))
+                    destLayouts.add(GlyphLayout(listOf(run2), VerticalAlignment.BOTTOM, l2Align))
                 }
 
-                val destLines = LayoutLines(destLayouts, LineSpacing.FLUSH_TO_EDGES)
-                val frame = DestinationFrame(listOf(destLines))
-                val destination = Destination(route = routeLines, frames = listOf(frame), routeAlignment = TextAlignment.LEFT)
+                val destLines = LayoutLines(destLayouts, vSpacing)
 
-                val sign = DestSign(width.toInt(), height.toInt())
-                sign.destination = destination
-                bufferedImages.add(sign.generateImageForState(0).backing)
+                destFrames.add(DestinationFrame(
+                    layoutLines = listOf(destLines),
+                    animation = animationType
+                ))
+                screenTimes.add(frameDelay / 1000f)
             }
 
-            if (bufferedImages.size > 1) {
+            val destination = Destination(
+                route = routeLines,
+                frames = destFrames,
+                screenTimes = screenTimes,
+                routeAlignment = routeAlign
+            )
+
+            val sign = DestSign(width.toInt(), height.toInt(), defaultAnimation = AnimationType.Falldown(0.25f))
+            sign.destination = destination
+
+            if (sign.isAnimated()) {
                 exchange.responseHeaders.add("Content-Type", "image/gif")
                 exchange.sendResponseHeaders(200, 0)
-                writeAnimatedGif(bufferedImages, frameDelay, exchange.responseBody)
+                sign.generateGif(exchange.responseBody)
             } else {
                 exchange.responseHeaders.add("Content-Type", "image/png")
                 exchange.sendResponseHeaders(200, 0)
-                ImageIO.write(bufferedImages[0], "png", exchange.responseBody)
+                ImageIO.write(sign.generateImageForState(0).backing, "png", exchange.responseBody)
             }
             exchange.responseBody.close()
 
@@ -134,40 +188,6 @@ fun main() {
     println("signmatrix API running on http://localhost:8080/api/sign")
 }
 
-fun writeAnimatedGif(frames: List<BufferedImage>, delayMs: Int, out: OutputStream) {
-    val writer = ImageIO.getImageWritersByFormatName("gif").next()
-    val ios = ImageIO.createImageOutputStream(out)
-    writer.output = ios
-    writer.prepareWriteSequence(null)
-
-    for (frame in frames) {
-        val imageMetaData = writer.getDefaultImageMetadata(ImageTypeSpecifier.createFromRenderedImage(frame), null)
-        val metaFormatName = imageMetaData.nativeMetadataFormatName
-        val root = imageMetaData.getAsTree(metaFormatName) as IIOMetadataNode
-
-        val graphicsControlExtensionNode = IIOMetadataNode("GraphicControlExtension")
-        graphicsControlExtensionNode.setAttribute("disposalMethod", "none")
-        graphicsControlExtensionNode.setAttribute("userInputFlag", "FALSE")
-        graphicsControlExtensionNode.setAttribute("transparentColorFlag", "FALSE")
-        graphicsControlExtensionNode.setAttribute("delayTime", (delayMs / 10).toString())
-        graphicsControlExtensionNode.setAttribute("transparentColorIndex", "0")
-
-        val appExtensionsNode = IIOMetadataNode("ApplicationExtensions")
-        val appExtensionNode = IIOMetadataNode("ApplicationExtension")
-        appExtensionNode.setAttribute("applicationID", "NETSCAPE")
-        appExtensionNode.setAttribute("authenticationCode", "2.0")
-        appExtensionNode.userObject = byteArrayOf(1, 0, 0)
-        appExtensionsNode.appendChild(appExtensionNode)
-
-        root.appendChild(graphicsControlExtensionNode)
-        root.appendChild(appExtensionsNode)
-
-        imageMetaData.setFromTree(metaFormatName, root)
-        writer.writeToSequence(IIOImage(frame, null, imageMetaData), null)
-    }
-    writer.endWriteSequence()
-    ios.close()
-}
 
 fun applyLetterSpacing(parsedText: String, spacingStr: String): String {
     val spaces = spacingStr.toIntOrNull() ?: 0
