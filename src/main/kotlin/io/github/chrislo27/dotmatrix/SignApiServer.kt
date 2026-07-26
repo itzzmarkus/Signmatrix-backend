@@ -12,7 +12,7 @@ fun main() {
     server.createContext("/api/sign") { exchange ->
         exchange.responseHeaders.add("Access-Control-Allow-Origin", "*")
 
-        val query = exchange.requestURI.query ?: ""
+        val query = exchange.requestURI.rawQuery ?: ""
         val params = query.split("&").associate {
             val parts = it.split("=")
             val key = parts.getOrElse(0) { "" }
