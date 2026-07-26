@@ -161,6 +161,15 @@ fun main() {
         }
     }
 
+    server.createContext("/api/ping") { exchange ->
+        exchange.responseHeaders.add("Access-Control-Allow-Origin", "*")
+        val response = "pong!"
+        exchange.sendResponseHeaders(200, response.length.toLong())
+        exchange.responseBody.write(response.toByteArray())
+        exchange.responseBody.close()
+        println("ping")
+    }
+
     server.start()
     println("signmatrix API running on http://localhost:8080/api/sign")
 }
