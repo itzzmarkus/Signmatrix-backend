@@ -34,6 +34,21 @@ fun main() {
         } catch (_: Exception) {
             DestSign.ORANGE
         }
+        val offColorHex = params["offColor"] ?: "222222"
+        val unlitColor = try {
+            val r = offColorHex.substring(0, 2).toInt(16)
+            val g = offColorHex.substring(2, 4).toInt(16)
+            val b = offColorHex.substring(4, 6).toInt(16)
+            Color(r, g, b, 255)
+        } catch (_: Exception) {
+            Color(64, 64, 64, 255)
+        }
+
+        val ledShape = params["ledShape"] ?: "square"
+        val ledSize = params["ledSize"]?.toIntOrNull() ?: 3
+        val ledGap = params["ledGap"]?.toIntOrNull() ?: 1
+
+        val isCircles = ledShape.uppercase() == "ROUND" && ledSize >= 4
 
         try {
             val fonts = DestSignTest.fonts
@@ -82,87 +97,48 @@ fun main() {
             val verticalSpacingFrames = (params["verticalSpacing"] ?: "").split("|")
 
             val frameCount = maxOf(line1Frames.size, line2Frames.size)
-
-            val destFrames = mutableListOf<DestinationFrame>()
-            val screenTimes = mutableListOf<Float>()
-
-            for (i in 0 until frameCount) {
-                val l1Str = line1Frames.getOrElse(i) { line1Frames.lastOrNull() ?: "" }
-                val l1FontStr = line1FontFrames.getOrElse(i) { line1FontFrames.lastOrNull() ?: "" }
-                val l1Space = line1SpacingFrames.getOrElse(i) { line1SpacingFrames.lastOrNull() ?: "0" }
-
-                val l2Str = line2Frames.getOrElse(i) { line2Frames.lastOrNull() ?: "" }
-                val l2FontStr = line2FontFrames.getOrElse(i) { line2FontFrames.lastOrNull() ?: "" }
-                val l2Space = line2SpacingFrames.getOrElse(i) { line2SpacingFrames.lastOrNull() ?: "0" }
-
-                val line1Raw = parseDestSignEscapes(l1Str)
-                val line1Text = applyLetterSpacing(line1Raw, l1Space)
-
-                val line2Raw = parseDestSignEscapes(l2Str)
-                val line2Text = applyLetterSpacing(line2Raw, l2Space)
-
-                val isStacked = l2Str.isNotEmpty()
-                val line1Font = if (l1FontStr.isNotBlank()) l1FontStr else (if (isStacked) "8d" else "15d")
-                val line2Font = if (l2FontStr.isNotBlank()) l2FontStr else "16d"
-
-                val destLayouts = mutableListOf<GlyphLayout>()
-
-                val animStr = animFrames.getOrElse(i) { animFrames.lastOrNull() ?: "NONE" }
-                val animSpeedStr = animSpeedFrames.getOrElse(i) { animSpeedFrames.lastOrNull() ?: "0.25" }
-                val animSpeed = animSpeedStr.toFloatOrNull() ?: 0.25f
-
-                val animationType = when (animStr.uppercase()) {
-                    "FALLDOWN" -> AnimationType.Falldown(animSpeed)
-                    "FALLUP" -> AnimationType.Fallup(animSpeed)
-                    "SIDEWIPE" -> AnimationType.Sidewipe(animSpeed)
-                    "SCROLL" -> AnimationType.HorizontalScroll(animSpeed)
-                    else -> AnimationType.NoAnimation
-                }
-
-                val l1AlignStr = l1AlignFrames.getOrElse(i) { l1AlignFrames.lastOrNull() ?: "CENTRE" }
-                val l2AlignStr = l2AlignFrames.getOrElse(i) { l2AlignFrames.lastOrNull() ?: "CENTRE" }
-                val vSpacingStr = verticalSpacingFrames.getOrElse(i) { verticalSpacingFrames.lastOrNull() ?: "FLUSH" }
-
-                val l1Align = when(l1AlignStr.uppercase()) {
-                    "LEFT" -> TextAlignment.LEFT
-                    "RIGHT" -> TextAlignment.RIGHT
-                    else -> TextAlignment.CENTRE
-                }
-                val l2Align = when(l2AlignStr.uppercase()) {
-                    "LEFT" -> TextAlignment.LEFT
-                    "RIGHT" -> TextAlignment.RIGHT
-                    else -> TextAlignment.CENTRE
-                }
-                val vSpacing = if (vSpacingStr.uppercase() == "EQUISPACED") LineSpacing.EQUISPACED else LineSpacing.FLUSH_TO_EDGES
-
-                if (!isStacked) {
-                    val run1 = GlyphRun(fonts.getValue(line1Font), line1Text, signColor)
-                    destLayouts.add(GlyphLayout(listOf(run1), VerticalAlignment.CENTRE, l1Align))
-                } else {
-                    val run1 = GlyphRun(fonts.getValue(line1Font), line1Text, signColor)
-                    val run2 = GlyphRun(fonts.getValue(line2Font), line2Text, signColor)
-                    destLayouts.add(GlyphLayout(listOf(run1), VerticalAlignment.TOP, l1Align))
-                    destLayouts.add(GlyphLayout(listOf(run2), VerticalAlignment.BOTTOM, l2Align))
-                }
-
-                val destLines = LayoutLines(destLayouts, vSpacing)
-
-                destFrames.add(DestinationFrame(
-                    layoutLines = listOf(destLines),
-                    animation = animationType
-                ))
-                screenTimes.add(frameDelay / 1000f)
-            }
-
-            val destination = Destination(
-                route = routeLines,
-                frames = destFrames,
-                screenTimes = screenTimes,
-                routeAlignment = routeAlign
+            val destination = buildDestination(
+                frameCount, fonts, signColor, routeLines, routeAlign,
+                line1Frames, line1FontFrames, line1SpacingFrames,
+                line2Frames, line2FontFrames, line2SpacingFrames,
+                animFrames, animSpeedFrames, l1AlignFrames, l2AlignFrames, verticalSpacingFrames, frameDelay
             )
 
-            val sign = DestSign(width.toInt(), height.toInt(), defaultAnimation = AnimationType.Falldown(0.25f))
+            val sign = DestSign(
+                width.toInt(),
+                height.toInt(),
+                ledSize = ledSize,
+                ledSpacing = ledGap,
+                circles = isCircles,
+                offColor = unlitColor,
+                defaultAnimation = AnimationType.Falldown(0.25f)
+            )
+
             sign.destination = destination
+
+            val prLine1Frames = (params["prLine1"] ?: "").split("|")
+            val prLine2Frames = (params["prLine2"] ?: "").split("|")
+
+            if (prLine1Frames.any { it.isNotBlank() } || prLine2Frames.any { it.isNotBlank() }) {
+                val prCount = maxOf(prLine1Frames.size, prLine2Frames.size)
+
+                sign.pr = buildDestination(
+                    prCount, fonts, signColor,
+                    LayoutLines(emptyList()), TextAlignment.LEFT,
+                    prLine1Frames,
+                    (params["prLine1Font"] ?: "").split("|"),
+                    (params["prLine1Spacing"] ?: "0").split("|"),
+                    prLine2Frames,
+                    (params["prLine2Font"] ?: "").split("|"),
+                    (params["prLine2Spacing"] ?: "0").split("|"),
+                    (params["prAnimation"] ?: "").split("|"),
+                    (params["prAnimSpeed"] ?: "0.25").split("|"),
+                    (params["prLine1Align"] ?: "").split("|"),
+                    (params["prLine2Align"] ?: "").split("|"),
+                    (params["prVerticalSpacing"] ?: "").split("|"),
+                    frameDelay
+                )
+            }
 
             if (sign.isAnimated()) {
                 exchange.responseHeaders.add("Content-Type", "image/gif")
@@ -228,4 +204,88 @@ fun parseDestSignEscapes(str: String): String {
     }
     if (inEscape) strb.append('\\')
     return strb.toString()
+}
+
+fun buildDestination(
+    frameCount: Int,
+    fonts: Map<String, DotMtxFont>,
+    signColor: Color,
+    routeLines: LayoutLines,
+    routeAlign: TextAlignment,
+    line1Frames: List<String>,
+    line1FontFrames: List<String>,
+    line1SpacingFrames: List<String>,
+    line2Frames: List<String>,
+    line2FontFrames: List<String>,
+    line2SpacingFrames: List<String>,
+    animFrames: List<String>,
+    animSpeedFrames: List<String>,
+    l1AlignFrames: List<String>,
+    l2AlignFrames: List<String>,
+    verticalSpacingFrames: List<String>,
+    frameDelay: Int
+): Destination {
+    val destFrames = mutableListOf<DestinationFrame>()
+    val screenTimes = mutableListOf<Float>()
+
+    for (i in 0 until frameCount) {
+        val l1Str = line1Frames.getOrElse(i) { line1Frames.lastOrNull() ?: "" }
+        val l1FontStr = line1FontFrames.getOrElse(i) { line1FontFrames.lastOrNull() ?: "" }
+        val l1Space = line1SpacingFrames.getOrElse(i) { line1SpacingFrames.lastOrNull() ?: "0" }
+
+        val l2Str = line2Frames.getOrElse(i) { line2Frames.lastOrNull() ?: "" }
+        val l2FontStr = line2FontFrames.getOrElse(i) { line2FontFrames.lastOrNull() ?: "" }
+        val l2Space = line2SpacingFrames.getOrElse(i) { line2SpacingFrames.lastOrNull() ?: "0" }
+
+        val line1Raw = parseDestSignEscapes(l1Str)
+        val line1Text = applyLetterSpacing(line1Raw, l1Space)
+        val line2Raw = parseDestSignEscapes(l2Str)
+        val line2Text = applyLetterSpacing(line2Raw, l2Space)
+
+        val isStacked = l2Str.isNotEmpty()
+        val line1Font = if (l1FontStr.isNotBlank()) l1FontStr else (if (isStacked) "8d" else "15d")
+        val line2Font = if (l2FontStr.isNotBlank()) l2FontStr else "16d"
+
+        val animStr = animFrames.getOrElse(i) { animFrames.lastOrNull() ?: "NONE" }
+        val animSpeed = animSpeedFrames.getOrElse(i) { animSpeedFrames.lastOrNull() ?: "0.25" }.toFloatOrNull() ?: 0.25f
+        val animationType = when (animStr.uppercase()) {
+            "FALLDOWN" -> AnimationType.Falldown(animSpeed)
+            "FALLUP" -> AnimationType.Fallup(animSpeed)
+            "SIDEWIPE" -> AnimationType.Sidewipe(animSpeed)
+            "SCROLL" -> AnimationType.HorizontalScroll(animSpeed)
+            else -> AnimationType.NoAnimation
+        }
+
+        val l1AlignStr = l1AlignFrames.getOrElse(i) { l1AlignFrames.lastOrNull() ?: "CENTRE" }
+        val l2AlignStr = l2AlignFrames.getOrElse(i) { l2AlignFrames.lastOrNull() ?: "CENTRE" }
+        val vSpacingStr = verticalSpacingFrames.getOrElse(i) { verticalSpacingFrames.lastOrNull() ?: "FLUSH" }
+
+        val l1Align =
+            if (l1AlignStr.uppercase() == "LEFT") TextAlignment.LEFT else if (l1AlignStr.uppercase() == "RIGHT") TextAlignment.RIGHT else TextAlignment.CENTRE
+        val l2Align =
+            if (l2AlignStr.uppercase() == "LEFT") TextAlignment.LEFT else if (l2AlignStr.uppercase() == "RIGHT") TextAlignment.RIGHT else TextAlignment.CENTRE
+        val vSpacing =
+            if (vSpacingStr.uppercase() == "EQUISPACED") LineSpacing.EQUISPACED else LineSpacing.FLUSH_TO_EDGES
+
+        val destLayouts = mutableListOf<GlyphLayout>()
+        if (!isStacked) {
+            val run1 = GlyphRun(fonts.getValue(line1Font), line1Text, signColor)
+            destLayouts.add(GlyphLayout(listOf(run1), VerticalAlignment.CENTRE, l1Align))
+        } else {
+            val run1 = GlyphRun(fonts.getValue(line1Font), line1Text, signColor)
+            val run2 = GlyphRun(fonts.getValue(line2Font), line2Text, signColor)
+            destLayouts.add(GlyphLayout(listOf(run1), VerticalAlignment.TOP, l1Align))
+            destLayouts.add(GlyphLayout(listOf(run2), VerticalAlignment.BOTTOM, l2Align))
+        }
+
+        destFrames.add(
+            DestinationFrame(
+                layoutLines = listOf(LayoutLines(destLayouts, vSpacing)),
+                animation = animationType
+            )
+        )
+        screenTimes.add(frameDelay / 1000f)
+    }
+
+    return Destination(routeLines, destFrames, screenTimes, routeAlign)
 }
