@@ -66,6 +66,7 @@ fun main() {
 
             val animFrames = (params["animation"] ?: "").split("|")
             val animSpeedFrames = (params["animSpeed"] ?: "").split("|")
+            val delayFrames = (params["delay"] ?: "").split("|")
 
             val globalRouteStr = routeFrames.firstOrNull() ?: ""
             val globalRouteFont = routeFontFrames.firstOrNull() ?: "16d"
@@ -75,6 +76,8 @@ fun main() {
 
             val routeText = parseDestSignEscapes(globalRouteStr)
             val routeSuffixText = parseDestSignEscapes(routeSuffix)
+
+
 
             val routeLines = if (routeText.isNotEmpty() || routeSuffixText.isNotEmpty()) {
                 val runs = mutableListOf<GlyphRun>()
@@ -101,7 +104,7 @@ fun main() {
                 frameCount, fonts, signColor, routeLines, routeAlign,
                 line1Frames, line1FontFrames, line1SpacingFrames,
                 line2Frames, line2FontFrames, line2SpacingFrames,
-                animFrames, animSpeedFrames, l1AlignFrames, l2AlignFrames, verticalSpacingFrames, frameDelay
+                animFrames, animSpeedFrames, l1AlignFrames, l2AlignFrames, verticalSpacingFrames, delayFrames, frameDelay
             )
 
             val sign = DestSign(
@@ -118,6 +121,7 @@ fun main() {
 
             val prLine1Frames = (params["prLine1"] ?: "").split("|")
             val prLine2Frames = (params["prLine2"] ?: "").split("|")
+            val prDelayFrames = (params["prDelay"] ?: "").split("|")
 
             if (prLine1Frames.any { it.isNotBlank() } || prLine2Frames.any { it.isNotBlank() }) {
                 val prCount = maxOf(prLine1Frames.size, prLine2Frames.size)
@@ -136,7 +140,7 @@ fun main() {
                     (params["prLine1Align"] ?: "").split("|"),
                     (params["prLine2Align"] ?: "").split("|"),
                     (params["prVerticalSpacing"] ?: "").split("|"),
-                    frameDelay
+                    prDelayFrames, frameDelay
                 )
             }
 
@@ -232,6 +236,7 @@ fun buildDestination(
     l1AlignFrames: List<String>,
     l2AlignFrames: List<String>,
     verticalSpacingFrames: List<String>,
+    delayFrames: List<String>,
     frameDelay: Int
 ): Destination {
     val destFrames = mutableListOf<DestinationFrame>()
@@ -246,14 +251,12 @@ fun buildDestination(
         val l2FontStr = line2FontFrames.getOrElse(i) { line2FontFrames.lastOrNull() ?: "" }
         val l2Space = line2SpacingFrames.getOrElse(i) { line2SpacingFrames.lastOrNull() ?: "0" }
 
-        val line1Raw = parseDestSignEscapes(l1Str)
-        val line1Text = applyLetterSpacing(line1Raw, l1Space)
-        val line2Raw = parseDestSignEscapes(l2Str)
-        val line2Text = applyLetterSpacing(line2Raw, l2Space)
-
         val isStacked = l2Str.isNotEmpty()
-        val line1Font = if (l1FontStr.isNotBlank()) l1FontStr else (if (isStacked) "8d" else "15d")
-        val line2Font = if (l2FontStr.isNotBlank()) l2FontStr else "16d"
+        val defaultL1Font = if (isStacked) "8d" else "15d"
+        val defaultL2Font = "16d"
+
+        val l1Runs = buildGlyphRuns(l1Str, l1FontStr, l1Space, defaultL1Font, fonts, signColor)
+        val l2Runs = buildGlyphRuns(l2Str, l2FontStr, l2Space, defaultL2Font, fonts, signColor)
 
         val animStr = animFrames.getOrElse(i) { animFrames.lastOrNull() ?: "NONE" }
         val animSpeed = animSpeedFrames.getOrElse(i) { animSpeedFrames.lastOrNull() ?: "0.25" }.toFloatOrNull() ?: 0.25f
@@ -278,13 +281,10 @@ fun buildDestination(
 
         val destLayouts = mutableListOf<GlyphLayout>()
         if (!isStacked) {
-            val run1 = GlyphRun(fonts.getValue(line1Font), line1Text, signColor)
-            destLayouts.add(GlyphLayout(listOf(run1), VerticalAlignment.CENTRE, l1Align))
+            destLayouts.add(GlyphLayout(l1Runs, VerticalAlignment.CENTRE, l1Align))
         } else {
-            val run1 = GlyphRun(fonts.getValue(line1Font), line1Text, signColor)
-            val run2 = GlyphRun(fonts.getValue(line2Font), line2Text, signColor)
-            destLayouts.add(GlyphLayout(listOf(run1), VerticalAlignment.TOP, l1Align))
-            destLayouts.add(GlyphLayout(listOf(run2), VerticalAlignment.BOTTOM, l2Align))
+            destLayouts.add(GlyphLayout(l1Runs, VerticalAlignment.TOP, l1Align))
+            destLayouts.add(GlyphLayout(l2Runs, VerticalAlignment.BOTTOM, l2Align))
         }
 
         destFrames.add(
@@ -293,8 +293,39 @@ fun buildDestination(
                 animation = animationType
             )
         )
-        screenTimes.add(frameDelay / 1000f)
+
+        val delayStr = delayFrames.getOrElse(i) { delayFrames.lastOrNull() ?: "" }
+        val thisDelay = delayStr.toIntOrNull() ?: frameDelay
+
+        screenTimes.add(thisDelay / 1000f)
     }
 
     return Destination(routeLines, destFrames, screenTimes, routeAlign)
+}
+
+fun buildGlyphRuns(
+    rawString: String,
+    fontString: String,
+    spacingStr: String,
+    defaultFontFallback: String,
+    fonts: Map<String, DotMtxFont>,
+    signColor: Color
+): List<GlyphRun> {
+    if (rawString.isEmpty()) return emptyList()
+
+    val textSegments = rawString.split("^")
+    val fontSegments = fontString.split("^")
+
+    return textSegments.mapIndexed { index, textSeg ->
+        // Grab the matching font, or fallback to the last used font / default if missing
+        val fontName = fontSegments.getOrElse(index) { fontSegments.lastOrNull() ?: defaultFontFallback }.ifBlank { defaultFontFallback }
+
+        val parsedText = parseDestSignEscapes(textSeg)
+        val spacedText = applyLetterSpacing(parsedText, spacingStr)
+
+        // Safeguard in case they type a font name that doesn't exist
+        val resolvedFont = fonts[fontName] ?: fonts[defaultFontFallback] ?: fonts.values.first()
+
+        GlyphRun(resolvedFont, spacedText, signColor)
+    }
 }

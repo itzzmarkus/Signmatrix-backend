@@ -91,7 +91,18 @@ object DestSignTest {
             "24q" to DotMtxFont(readClasspathResourceAsString("dotmatrix/variable/24QVW.json"), readClasspathResAsImage("dotmatrix/variable/24QVW.png")),
             "f16" to DotMtxFont(readClasspathResourceAsString("dotmatrix/variable/F16VW.json"), readClasspathResAsImage("dotmatrix/variable/F16VW.png")),
             "5x7" to DotMtxFont(readClasspathResourceAsString("dotmatrix/fixed/5X7.json"), readClasspathResAsImage("dotmatrix/fixed/5X7.png")),
-            "8x14" to DotMtxFont(readClasspathResourceAsString("dotmatrix/fixed/8X14.json"), readClasspathResAsImage("dotmatrix/fixed/8X14.png"))
+            "8x14" to DotMtxFont(readClasspathResourceAsString("dotmatrix/fixed/8X14.json"), readClasspathResAsImage("dotmatrix/fixed/8X14.png")),
+
+            // new balios
+            "balios7" to DotMtxFont(readClasspathResourceAsString("dotmatrix/balios/4x7.json"), readClasspathResAsImage("dotmatrix/balios/4x7.png")),
+            "balios7w" to DotMtxFont(readClasspathResourceAsString("dotmatrix/balios/6x7.json"), readClasspathResAsImage("dotmatrix/balios/6x7.png")),
+            "balios8" to DotMtxFont(readClasspathResourceAsString("dotmatrix/balios/4x8.json"), readClasspathResAsImage("dotmatrix/balios/4x8.png")),
+            "balios8d" to DotMtxFont(readClasspathResourceAsString("dotmatrix/balios/4x8d.json"), readClasspathResAsImage("dotmatrix/balios/4x8d.png")),
+            "balios10" to DotMtxFont(readClasspathResourceAsString("dotmatrix/balios/6x10.json"), readClasspathResAsImage("dotmatrix/balios/6x10.png")),
+            "balios12" to DotMtxFont(readClasspathResourceAsString("dotmatrix/balios/7x12.json"), readClasspathResAsImage("dotmatrix/balios/7x12.png")),
+            "balios14" to DotMtxFont(readClasspathResourceAsString("dotmatrix/balios/7x14.json"), readClasspathResAsImage("dotmatrix/balios/7x14.png")),
+            "balios16" to DotMtxFont(readClasspathResourceAsString("dotmatrix/balios/8x16.json"), readClasspathResAsImage("dotmatrix/balios/8x16.png")),
+            "balios16w" to DotMtxFont(readClasspathResourceAsString("dotmatrix/balios/12x16.json"), readClasspathResAsImage("dotmatrix/balios/12x16.png"))
         )
     }
 
