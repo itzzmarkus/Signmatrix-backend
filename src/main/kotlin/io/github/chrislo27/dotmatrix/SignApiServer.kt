@@ -58,10 +58,12 @@ fun main() {
 
             val line1Frames = (params["line1"] ?: "NOT IN SERVICE").split("|")
             val line1FontFrames = (params["line1Font"] ?: "").split("|")
+            val line1ColorFrames = (params["line1Color"] ?: "").split("|")
             val line1SpacingFrames = (params["line1Spacing"] ?: "0").split("|")
 
             val line2Frames = (params["line2"] ?: "").split("|")
             val line2FontFrames = (params["line2Font"] ?: "").split("|")
+            val line2ColorFrames = (params["line2Color"] ?: "").split("|")
             val line2SpacingFrames = (params["line2Spacing"] ?: "0").split("|")
 
             val animFrames = (params["animation"] ?: "").split("|")
@@ -77,21 +79,23 @@ fun main() {
             val routeText = parseDestSignEscapes(globalRouteStr)
             val routeSuffixText = parseDestSignEscapes(routeSuffix)
 
-
+            val routeColor = parseCustomColor(params["routeColor"], signColor)
+            val routeSuffixColor = parseCustomColor(params["routeSuffixColor"], signColor)
 
             val routeLines = if (routeText.isNotEmpty() || routeSuffixText.isNotEmpty()) {
                 val runs = mutableListOf<GlyphRun>()
                 if (routeText.isNotEmpty()) {
-                    runs.add(GlyphRun(fonts.getValue(globalRouteFont), routeText, signColor))
+                    runs.add(GlyphRun(fonts.getValue(globalRouteFont), routeText, routeColor))
                 }
                 if (routeSuffixText.isNotEmpty()) {
-                    runs.add(GlyphRun(fonts.getValue(routeSuffixFont), routeSuffixText, signColor))
+                    runs.add(GlyphRun(fonts.getValue(routeSuffixFont), routeSuffixText, routeSuffixColor))
                 }
                 val layout = GlyphLayout(runs, VerticalAlignment.BOTTOM, TextAlignment.CENTRE)
                 LayoutLines(listOf(layout), LineSpacing.FLUSH_TO_EDGES)
             } else {
                 LayoutLines(emptyList())
             }
+
             val routeAlignStr = params["routeAlign"]?.uppercase() ?: "LEFT"
             val routeAlign = if (routeAlignStr == "RIGHT") TextAlignment.RIGHT else TextAlignment.LEFT
 
@@ -102,8 +106,8 @@ fun main() {
             val frameCount = maxOf(line1Frames.size, line2Frames.size)
             val destination = buildDestination(
                 frameCount, fonts, signColor, routeLines, routeAlign,
-                line1Frames, line1FontFrames, line1SpacingFrames,
-                line2Frames, line2FontFrames, line2SpacingFrames,
+                line1Frames, line1FontFrames, line1ColorFrames, line1SpacingFrames,
+                line2Frames, line2FontFrames, line2ColorFrames, line2SpacingFrames,
                 animFrames, animSpeedFrames, l1AlignFrames, l2AlignFrames, verticalSpacingFrames, delayFrames, frameDelay
             )
 
@@ -123,6 +127,9 @@ fun main() {
             val prLine2Frames = (params["prLine2"] ?: "").split("|")
             val prDelayFrames = (params["prDelay"] ?: "").split("|")
 
+            val prLine1ColorFrames = (params["prLine1Color"] ?: "").split("|")
+            val prLine2ColorFrames = (params["prLine2Color"] ?: "").split("|")
+
             if (prLine1Frames.any { it.isNotBlank() } || prLine2Frames.any { it.isNotBlank() }) {
                 val prCount = maxOf(prLine1Frames.size, prLine2Frames.size)
 
@@ -131,9 +138,11 @@ fun main() {
                     LayoutLines(emptyList()), TextAlignment.LEFT,
                     prLine1Frames,
                     (params["prLine1Font"] ?: "").split("|"),
+                    prLine1ColorFrames,
                     (params["prLine1Spacing"] ?: "0").split("|"),
                     prLine2Frames,
                     (params["prLine2Font"] ?: "").split("|"),
+                    prLine2ColorFrames,
                     (params["prLine2Spacing"] ?: "0").split("|"),
                     (params["prAnimation"] ?: "").split("|"),
                     (params["prAnimSpeed"] ?: "0.25").split("|"),
@@ -227,9 +236,11 @@ fun buildDestination(
     routeAlign: TextAlignment,
     line1Frames: List<String>,
     line1FontFrames: List<String>,
+    line1ColorFrames: List<String>,
     line1SpacingFrames: List<String>,
     line2Frames: List<String>,
     line2FontFrames: List<String>,
+    line2ColorFrames: List<String>,
     line2SpacingFrames: List<String>,
     animFrames: List<String>,
     animSpeedFrames: List<String>,
@@ -245,18 +256,20 @@ fun buildDestination(
     for (i in 0 until frameCount) {
         val l1Str = line1Frames.getOrElse(i) { line1Frames.lastOrNull() ?: "" }
         val l1FontStr = line1FontFrames.getOrElse(i) { line1FontFrames.lastOrNull() ?: "" }
+        val l1ColorStr = line1ColorFrames.getOrElse(i) { line1ColorFrames.lastOrNull() ?: "" }
         val l1Space = line1SpacingFrames.getOrElse(i) { line1SpacingFrames.lastOrNull() ?: "0" }
 
         val l2Str = line2Frames.getOrElse(i) { line2Frames.lastOrNull() ?: "" }
         val l2FontStr = line2FontFrames.getOrElse(i) { line2FontFrames.lastOrNull() ?: "" }
+        val l2ColorStr = line2ColorFrames.getOrElse(i) { line2ColorFrames.lastOrNull() ?: "" }
         val l2Space = line2SpacingFrames.getOrElse(i) { line2SpacingFrames.lastOrNull() ?: "0" }
 
         val isStacked = l2Str.isNotEmpty()
         val defaultL1Font = if (isStacked) "8d" else "15d"
         val defaultL2Font = "16d"
 
-        val l1Runs = buildGlyphRuns(l1Str, l1FontStr, l1Space, defaultL1Font, fonts, signColor)
-        val l2Runs = buildGlyphRuns(l2Str, l2FontStr, l2Space, defaultL2Font, fonts, signColor)
+        val l1Runs = buildGlyphRuns(l1Str, l1FontStr, l1ColorStr, l1Space, defaultL1Font, signColor, fonts)
+        val l2Runs = buildGlyphRuns(l2Str, l2FontStr, l2ColorStr, l2Space, defaultL2Font, signColor, fonts)
 
         val animStr = animFrames.getOrElse(i) { animFrames.lastOrNull() ?: "NONE" }
         val animSpeed = animSpeedFrames.getOrElse(i) { animSpeedFrames.lastOrNull() ?: "0.25" }.toFloatOrNull() ?: 0.25f
@@ -306,26 +319,56 @@ fun buildDestination(
 fun buildGlyphRuns(
     rawString: String,
     fontString: String,
+    colorString: String,
     spacingStr: String,
     defaultFontFallback: String,
-    fonts: Map<String, DotMtxFont>,
-    signColor: Color
+    defaultColor: Color,
+    fonts: Map<String, DotMtxFont>
 ): List<GlyphRun> {
     if (rawString.isEmpty()) return emptyList()
 
     val textSegments = rawString.split("^")
     val fontSegments = fontString.split("^")
+    val colorSegments = colorString.split("^")
 
     return textSegments.mapIndexed { index, textSeg ->
-        // Grab the matching font, or fallback to the last used font / default if missing
         val fontName = fontSegments.getOrElse(index) { fontSegments.lastOrNull() ?: defaultFontFallback }.ifBlank { defaultFontFallback }
+        val hexColor = colorSegments.getOrElse(index) { colorSegments.lastOrNull() ?: "" }.ifBlank { "" }
 
         val parsedText = parseDestSignEscapes(textSeg)
         val spacedText = applyLetterSpacing(parsedText, spacingStr)
-
-        // Safeguard in case they type a font name that doesn't exist
         val resolvedFont = fonts[fontName] ?: fonts[defaultFontFallback] ?: fonts.values.first()
 
-        GlyphRun(resolvedFont, spacedText, signColor)
+        val segmentColor = if (hexColor.length == 6) {
+            try {
+                Color(
+                    hexColor.substring(0, 2).toInt(16),
+                    hexColor.substring(2, 4).toInt(16),
+                    hexColor.substring(4, 6).toInt(16),
+                    255
+                )
+            } catch (_: Exception) {
+                defaultColor
+            }
+        } else {
+            defaultColor
+        }
+
+        GlyphRun(resolvedFont, spacedText, segmentColor)
+    }
+}
+
+fun parseCustomColor(hexColor: String?, defaultColor: Color): Color {
+    val cleanHex = hexColor?.replace("#", "") ?: ""
+    if (cleanHex.length != 6) return defaultColor
+    return try {
+        Color(
+            cleanHex.substring(0, 2).toInt(16),
+            cleanHex.substring(2, 4).toInt(16),
+            cleanHex.substring(4, 6).toInt(16),
+            255
+        )
+    } catch (_: Exception) {
+        defaultColor
     }
 }
